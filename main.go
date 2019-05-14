@@ -7,11 +7,35 @@ import (
 	"strings"
 )
 
-type Configuration map[string]string
+type Configuration map[string]map[string]string
 
 func New() Configuration {
-	result := make(map[string]string)
+	result := make(map[string]map[string]string)
 	return Configuration(result)
+}
+
+func (c *Configuration) AddSection(name string) {
+	if _, status := (*c)[name]; status != true {
+		(*c)[name] = make(map[string]string)
+	}
+}
+
+func (c *Configuration) AddValue(section, key, value string) error {
+	if _, status := (*c)[section]; status != true {
+		return errors.New("No such section: " + section)
+	}
+	(*c)[section][key] = value
+	return nil
+}
+
+func (c *Configuration) GetValue(section, key string) (string, error) {
+	if _, status := (*c)[section]; status != true {
+		return "", errors.New("No such section: " + section)
+	}
+	if _, status := (*c)[section][key]; status != true {
+		return "", errors.New("No such key " + key + " for section " + section)
+	}
+	return (*c)[section][key], nil
 }
 
 func (c *Configuration) ReadFromIni(filePath string) error {
@@ -19,8 +43,10 @@ func (c *Configuration) ReadFromIni(filePath string) error {
 	if err != nil {
 		return err
 	}
+	defer input.Close()
 
 	scanner := bufio.NewScanner(input)
+	section := "UNNAMED"
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		switch {
@@ -29,6 +55,7 @@ func (c *Configuration) ReadFromIni(filePath string) error {
 			continue
 		case line[0] == '[' && line[len(line)-1] == ']':
 			// this is new section - multisection files not supported yet
+			section = strings.Trim(line, " []\t")
 			continue
 		case line[0] == ';':
 			// this is comment - skip it
@@ -36,7 +63,10 @@ func (c *Configuration) ReadFromIni(filePath string) error {
 		case strings.Count(line, "=") == 1:
 			// this seems to be proper option
 			tokens := strings.Split(line, "=")
-			(*c)[strings.TrimSpace(tokens[0])] = strings.TrimSpace(tokens[1])
+			if _, status := (*c)[section]; status != true {
+				(*c)[section] = make(map[string]string)
+			}
+			c.AddValue(section, strings.TrimSpace(tokens[0]), strings.TrimSpace(tokens[1]))
 		default:
 			return errors.New("Unsupported line format:" + line)
 		}
@@ -46,7 +76,22 @@ func (c *Configuration) ReadFromIni(filePath string) error {
 }
 
 func (c *Configuration) WriteToIni(filePath string) error {
-	return errors.New("Not implemented")
+	output, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	writer := bufio.NewWriter(output)
+
+	for section, config := range *c {
+		writer.WriteString("; start new section")
+		writer.WriteString("[" + section + "]")
+		for key, value := range config {
+			writer.WriteString("\t" + key + " = " + value)
+		}
+		// print empty line just to make some separation
+		writer.WriteString("\n")
+	}
+	return nil
 }
 
 func (c *Configuration) ReadFromYaml(filePath string) error {
