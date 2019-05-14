@@ -91,6 +91,9 @@ func (c *Configuration) WriteToIni(filePath string) error {
 		// print empty line just to make some separation
 		writer.WriteString("\n")
 	}
+	writer.Flush()
+	output.Close()
+
 	return nil
 }
 
