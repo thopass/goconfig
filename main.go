@@ -7,15 +7,11 @@ import (
 	"strings"
 )
 
-type Configuration struct {
-	Data map[string]string
-}
+type Configuration map[string]string
 
-func New() *Configuration {
-	result := new(Configuration)
-	result.Data = make(map[string]string)
-
-	return result
+func New() Configuration {
+	result := make(map[string]string)
+	return Configuration(result)
 }
 
 func (c *Configuration) ReadFromIni(filePath string) error {
@@ -40,7 +36,7 @@ func (c *Configuration) ReadFromIni(filePath string) error {
 		case strings.Count(line, "=") == 1:
 			// this seems to be proper option
 			tokens := strings.Split(line, "=")
-			c.Data[strings.TrimSpace(tokens[0])] = strings.TrimSpace(tokens[1])
+			(*c)[strings.TrimSpace(tokens[0])] = strings.TrimSpace(tokens[1])
 		default:
 			return errors.New("Unsupported line format:" + line)
 		}
